@@ -63,6 +63,27 @@ For each task: create the worktree (`git worktree add`), dispatch implementer
 brief. Any reviewer rejection → the SAME implementer brief + findings gets a fix
 dispatch → re-review. Only mark the task done when both reviews approve.
 
+### Bounded repair — the Hermes 4 rule (Teknium/Nous, verified)
+
+Iterate until pass, or a MAXIMUM ITERATION COUNT, then discard the attempt:
+
+- MAX 2 FIX LOOPS per task per failing gate. A third pass on the same failure
+  with the same context is self-preference bias, not diligence.
+- RESAMPLE AFTER REPEATED FAILURE: after 2 failed fix loops on a task whose
+  acceptance is objective (binary check — exact output, test suite, schema
+  validation), throw away the worktree and dispatch a FRESH implementer from
+  scratch: new worktree, brief re-derived from the task spec — never seeded
+  with the failed attempt's context. SELECTION BEATS CORRECTION: generating a
+  new trajectory is often cheaper than repairing a broken one. Resamples enter
+  the same spec/quality gates as any first attempt (never merge unverified).
+- A resample that also fails twice means the TASK is wrong, not the workers:
+  escalate to ptah as a G0 finding (bad decomposition, missing dependency, or
+  thesis drift). Escalations are real: NEEDS_CONTEXT / BLOCKED — never
+  force-retry an escalation unchanged (iron law 6).
+- Reviewer verdicts are rubric-graded against the task's named contract
+  (correctness, spec adherence, no scope creep) — never vibes. No verdict in
+  the output = gate failed.
+
 Parallel tasks: only if disjoint files. Cap 3 concurrent on this machine.
 Same-file tasks: chain worktrees — later worktree branches off the merged
 earlier branch.
@@ -89,6 +110,11 @@ Returns JSON verdict: APPROVED | REJECTED | NEEDS_CONTEXT + findings.
 NEEDS_CONTEXT or transport failure = FAIL-CLOSED (never treat as approval).
 If the script is unavailable, fall back to delegate reviewers with the same
 briefs — degrade to same-lineage review, and say so in the ship report.
+
+ATTRIBUTION: the judge-weights-differ-from-generator-weights rule is Teknium's
+(Hermes 4 Technical Report, arXiv:2508.18255 §2.1.2, citing self-preference
+research). DHH's two-model workflow (fast explorer + deep thinker) is an
+INTERACTION-SPEED pattern, not decorrelation — do not cite it for this.
 
 ## Phase B' — Review-only (for "review X")
 

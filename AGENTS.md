@@ -32,8 +32,11 @@ never let it inherit session context.
   it needs to be, as large as one review can cleanly judge), exact paths,
   complete code, exact commands + expected output. DRY/YAGNI/TDD.
 - G1 Task gates — per task: implementer (RED shown, GREEN suite, SHA) →
-  spec-review → quality-review. Loop fixes until approved. Never reorder,
-  never skip, never accept "close enough."
+  spec-review → quality-review. Loop fixes until approved — bounded (Hermes 4
+  rule): max 2 fix loops, then RESAMPLE a fresh implementer from scratch if the
+  acceptance is objective; a twice-failed resample = G0 finding (the task is
+  wrong, not the workers). Never reorder, never skip, never accept "close
+  enough."
 - G2 Integration gate — ptah personally, THESIS-FIRST: re-read the G0 thesis,
   read the MERGED diff against it (seams between parallel worktrees are where
   holistic incoherence hides — seam findings are G2 findings), re-runs full suite,
@@ -80,7 +83,10 @@ models now; revisit only when budget allows.
 DECORRELATION PRINCIPLE: reviewers find the most when their failure modes differ
 from the implementer's. Same-family review shares training blind spots; different
 lineage decorrelates them. Open models make this nearly free — no frontier
-budget required.
+budget required. Attribution: Teknium (Hermes 4 Technical Report,
+arXiv:2508.18255 §2.1.2) — judges must always have different weights from the
+generator as a precaution against self-preference. DHH's two-model setup is an
+interaction-speed pattern, not this.
 
 LIVE CONFIG: implementer/architect/fixer/ops run delegate_task on inherit-main
 (z-ai/glm-5.3-flash lineage). ALL reviewers (spec/quality/adversarial) run as
