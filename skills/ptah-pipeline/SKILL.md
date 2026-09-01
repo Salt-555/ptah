@@ -34,6 +34,12 @@ not per-tool-call.
 ## Phase A — Plan (G0)
 
 Dispatch the architect brief (below). Review its plan yourself:
+- [ ] THESIS FIRST: the plan leads with the holistic solution stated from first
+  principles — what is the minimal coherent answer to the actual problem, what
+  gets built, what gets deliberately NOT built. Every task must cite how it
+  serves the thesis. A task that only itemizes without tracing is a G0 FAIL:
+  itemized rigor without a thesis produces locally-perfect, globally-incoherent
+  builds, and downstream gates will faithfully verify the wrong decomposition.
 - [ ] Tasks decomposed to independently verifiable units of any size — the unit
   is as small as it needs to be, as large as one review can cleanly judge
 - [ ] Exact file paths, exact commands + expected output per task
@@ -92,7 +98,12 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
 
 ## Phase C — Verify (G2, G3, G4) — ptah personally
 
-1. **G2**: read every diff file by file. Re-run full test suite yourself. Write and
+1. **G2**: read every diff file by file — THESIS-FIRST, not test-first: re-read
+   the G0 thesis, then read the MERGED diff against it. Per-task reviews never
+   see the seams; the joints between parallel worktrees are where holistic
+   incoherence hides, so seam findings (inconsistent abstractions, duplicated
+   logic that should be shared, interfaces that fit no single task's view) are
+   G2 findings. Re-run full test suite yourself. Write and
    run YOUR OWN independent smoke script (do not reuse worker curls). If your script
    fails: diff it against the actual API contract first — a failed harness is often
    a harness bug. Merged new modules must be in the build (grep the build script).
@@ -102,6 +113,10 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
 3. **G4**: dispatch fixer briefs (disjoint file ownership, fix ONLY findings, leave
    tree uncommitted) → re-verify → clean pass (clean-skill content pasted verbatim
    into brief, no commits) → re-run suite → commit with `[verified]` prefix.
+   G4 IS POLISH, NOT REDESIGN: if the clean pass wants to restructure or the fixer
+   findings imply the thesis drifted, that is a G0 finding — route it back to a new
+   plan, never absorb it as a late-stage rewrite (the merged tree is the worst
+   possible place for the biggest, least-verified diff of the project).
 
 ## Phase D — Ship (G5)
 

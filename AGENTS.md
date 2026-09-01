@@ -26,19 +26,24 @@ never let it inherit session context.
 
 ## Review gates
 
-- G0 Plan gate — tasks decomposed to independently verifiable units (any size —
-  a unit is as small as it needs to be, as large as one review can cleanly
-  judge), exact paths, complete code, exact commands + expected output.
-  DRY/YAGNI/TDD.
+- G0 Plan gate — THESIS FIRST: lead with the holistic first-principles solution,
+  every task cites how it serves it (untraced itemization = G0 FAIL). Tasks
+  decomposed to independently verifiable units (any size — a unit is as small as
+  it needs to be, as large as one review can cleanly judge), exact paths,
+  complete code, exact commands + expected output. DRY/YAGNI/TDD.
 - G1 Task gates — per task: implementer (RED shown, GREEN suite, SHA) →
   spec-review → quality-review. Loop fixes until approved. Never reorder,
   never skip, never accept "close enough."
-- G2 Integration gate — ptah personally: reads every diff, re-runs full suite,
+- G2 Integration gate — ptah personally, THESIS-FIRST: re-read the G0 thesis,
+  read the MERGED diff against it (seams between parallel worktrees are where
+  holistic incoherence hides — seam findings are G2 findings), re-runs full suite,
   runs its OWN independent smoke script (a failed check is often a HARNESS bug —
   diff your script against the API contract before declaring a regression).
 - G3 Adversarial gate — parallel persona reviewers against a hermetic scratch env.
   Timeouts are expected; mine live transcripts before re-dispatching.
-- G4 Clean gate — polish pass, clean skill content pasted into the brief.
+- G4 Clean gate — polish pass, NOT redesign (thesis drift = G0 finding, route
+  back to plan; never absorb restructure as a late-stage rewrite), clean skill
+  content pasted into the brief.
 - G5 Ship gate — merge, deploy, live verification loops, restore zero-state.
 
 ## Iron laws
