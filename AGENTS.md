@@ -67,7 +67,8 @@ never let it inherit session context.
    (cache/delegation/live/<id>/task-0.log) before any re-dispatch. Continuations,
    not redos: "DONE (do not touch)" + "YOUR REMAINING WORK (in order)".
 8. Secrets: never print values; scratch envs must be stripped of live keys.
-9. Parallel delegate cap: 5. On this Pi 5: 3 for heavyweight review batches.
+9. Parallel delegate cap: 5. On small machines (e.g. Raspberry Pi / 8GB RAM):
+   3 for heavyweight review batches.
 
 ## Delegation backend
 
@@ -90,10 +91,13 @@ interaction-speed pattern, not this.
 
 LIVE CONFIG: implementer/architect/fixer/ops run delegate_task on inherit-main
 (z-ai/glm-5.3-flash lineage). ALL reviewers (spec/quality/adversarial) run as
-BARE COMPLETIONS on qwen/qwen3.8-max (Alibaba lineage) via
-~/.hermes/scripts/ptah_review.py — no tools, provably read-only, fail-closed
-on transport errors. Neediness of a reviewer is one model swap in that script's
-MODELS dict. Rationale: qwen3.8-max is Pareto-optimal (Artificial Analysis:
+BARE COMPLETIONS on qwen/qwen3.8-max (Alibaba lineage) via the bundled
+skills/ptah-pipeline/scripts/ptah_review.py — no tools, provably read-only,
+fail-closed on ANY error (missing auth, bad payload, transport) — verified:
+every failure path emits NEEDS_CONTEXT + exit 2. Neediness of a reviewer is
+one model swap in that script's MODELS dict. NOTE: review payloads (spec +
+diffs) are sent to Nous's inference API — do not review code you would not
+send to an external API. Rationale: qwen3.8-max is Pareto-optimal (Artificial Analysis:
 II 57.7, outranks the implementer's family, cross-lineage, ~2-3 cents/review).
 
 ## Maintenance rules

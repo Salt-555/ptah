@@ -61,7 +61,7 @@ terminal:
   cwd: ~/projects
   timeout: 500
   daemon_term_grace_seconds: 2
-  env_passthrough: '["FAL_KEY"]'
+  env_passthrough: []
   home_mode: auto
   shell_init_files: []
   auto_source_bashrc: true

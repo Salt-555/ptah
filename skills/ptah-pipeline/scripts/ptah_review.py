@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 """Ptah bare-completion reviewer — cross-lineage review via Nous Portal.
 
-Dispatch pattern for spec/quality/adversarial reviews (Ptah v2, 2026-08-31):
+Dispatch pattern for spec/quality/adversarial reviews:
 a review is a BARE COMPLETION, not an agent. No tools = provably read-only
-(closes the v1 brief-contract tradeoff) and costs ~2-3 cents per review.
+and costs ~2-3 cents per review.
 
-Reviewer: qwen/qwen3.8-max (Alibaba lineage) — decorrelated from the
-implementer lineage (z-ai/glm-5.3-flash), per the DHH cross-family SOP.
-Pareto-optimal reviewer on Artificial Analysis data: II 57.7 / out $6/M,
-cheapest model that outranks the implementer's family.
+Reviewer: qwen/qwen3.8-max (Alibaba lineage), decorrelated from the
+implementer lineage per the Hermes 4 rule (arXiv:2508.18255 §2.1.2): judge
+weights must differ from generator weights to prevent self-preference.
+(Do NOT cite DHH's two-model workflow here — that is an interaction-speed
+pattern, not decorrelation.)
 
 Usage (from the ptah profile):
-    python3 ~/.hermes/scripts/ptah_review.py <review_type> <payload_file>
+    python3 <profile>/skills/ptah-pipeline/scripts/ptah_review.py <review_type> <payload_file>
       review_type: spec | quality | adversarial-user | adversarial-abuser
       payload_file: JSON {"verdict_contract": "...", "context": "...",
                           "evidence": "..."}
 
-Writes verdict JSON to stdout; exits 2 on any transport failure (fail-closed).
+Writes verdict JSON to stdout; exits 2 on ANY failure — transport, missing
+auth, unreadable payload (fail-closed: an unavailable reviewer is never an
+approval). Data-egress note: the payload (which contains code diffs) is sent
+to https://inference-api.nousresearch.com and processed by a third-party-lineage
+model. Do not review proprietary code you would not send to an external API.
 """
 import json
 import os
@@ -48,7 +53,7 @@ def load_token():
 
     for v in find_nous(auth):
         if isinstance(v, list):
-            v = v[0]
+            v = v[0] if v else None
         if isinstance(v, dict):
             tok = v.get("access_token")
             if tok:
@@ -101,7 +106,25 @@ def main():
     if review_type not in MODELS:
         print(f"unknown review_type {review_type}; choices: {list(MODELS)}")
         return 1
-    payload = json.load(open(payload_path))
+
+    def fail_closed(e):
+        # fail-closed: ANY failure — transport, auth, payload — is never an approval
+        print(json.dumps({"verdict": "NEEDS_CONTEXT",
+                          "findings": [{"severity": "critical",
+                                        "location": "transport",
+                                        "issue": f"reviewer unavailable: {e}"}],
+                          "summary": "review failed - fail-closed"}))
+        return 2
+
+    try:
+        payload = json.load(open(payload_path))
+    except Exception as e:
+        return fail_closed(e)
+
+    try:
+        token = load_token()
+    except Exception as e:
+        return fail_closed(e)
 
     body = json.dumps({
         "model": MODELS[review_type],
@@ -113,7 +136,7 @@ def main():
     req = urllib.request.Request(
         BASE, data=body, method="POST",
         headers={
-            "Authorization": f"Bearer {load_token()}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "User-Agent": "ptah-review/1.0",
         },
@@ -133,9 +156,9 @@ def main():
             }).encode()
             req2 = urllib.request.Request(
                 BASE, data=body2, method="POST",
-                headers={"Authorization": f"Bearer {load_token()}",
+                headers={"Authorization": f"Bearer {token}",
                          "Content-Type": "application/json"})
-            with urllib.request.urlopen(req2, timeout=300) as resp2:
+            with urllib.request.urlopen(req2, timeout=120) as resp2:
                 data = json.load(resp2)
             content = data["choices"][0]["message"].get("content") or ""
             if not content:

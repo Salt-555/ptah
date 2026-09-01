@@ -84,7 +84,10 @@ Iterate until pass, or a MAXIMUM ITERATION COUNT, then discard the attempt:
   (correctness, spec adherence, no scope creep) — never vibes. No verdict in
   the output = gate failed.
 
-Parallel tasks: only if disjoint files. Cap 3 concurrent on this machine.
+Parallel tasks: only if disjoint files (verified against the plan's
+file-ownership map before dispatch — never assumed). Cap concurrency to the
+machine: 3 heavyweight delegates on a small box (e.g. 8GB RAM), scale up on
+bigger hardware.
 Same-file tasks: chain worktrees — later worktree branches off the merged
 earlier branch.
 
@@ -142,7 +145,8 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
    fails: diff it against the actual API contract first — a failed harness is often
    a harness bug. Merged new modules must be in the build (grep the build script).
 2. **G3**: adversarial batch on hermetic scratch env (scratch DB, dev server, mock
-   upstream; strip live secrets — check /proc/<pid>/environ names). Pointed numbered
+   upstream; strip live secrets — check /proc/<pid>/environ for variable NAMES
+   only; never read or print values). Pointed numbered
    tests per lens. Verdict demanded. Timeouts: mine transcripts before re-dispatch.
 3. **G4**: dispatch fixer briefs (disjoint file ownership, fix ONLY findings, leave
    tree uncommitted) → re-verify → clean pass (clean-skill content from
