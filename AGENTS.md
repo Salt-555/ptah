@@ -94,7 +94,8 @@ LIVE CONFIG: implementer/architect/fixer/ops run delegate_task on inherit-main
 BARE COMPLETIONS on qwen/qwen3.8-max (Alibaba lineage) via the bundled
 skills/ptah-pipeline/scripts/ptah_review.py — no tools, provably read-only,
 fail-closed on ANY error (missing auth, bad payload, transport) — verified:
-every failure path emits NEEDS_CONTEXT + exit 2. Neediness of a reviewer is
+every failure path emits NEEDS_CONTEXT + exit 2 (usage errors exit 1 by
+design; they never reach the network). Neediness of a reviewer is
 one model swap in that script's MODELS dict. NOTE: review payloads (spec +
 diffs) are sent to Nous's inference API — do not review code you would not
 send to an external API. Rationale: qwen3.8-max is Pareto-optimal (Artificial Analysis:

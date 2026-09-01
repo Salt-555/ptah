@@ -1,7 +1,7 @@
 ---
 name: ptah-pipeline
 description: Use when building a product/feature from an idea, reviewing code, or adding a feature — the full gated build pipeline with ephemeral specialist subagent briefs. This is Ptah's job description.
-version: 1.0.0
+version: 1.3.0
 author: Ptah (built for Salt, 2026-08-31)
 license: MIT
 metadata:
@@ -320,6 +320,13 @@ REPORT: services affected, verification outputs, zero-state confirmation.
 
 # Pitfalls (hard-won)
 
+- **Long single-message final answers kill leaf subagents.** Two reviewers in one
+  day (verified 2026-09-01) died on "API call timed out after 90s" while composing
+  one long final report — after completing ALL their reading/analysis. The work
+  survives in the transcript; the answer never lands. Rule: for any deliverable
+  longer than ~300 words, write it INCREMENTALLY to a file with write_file/patch
+  as sections complete, and keep the final chat message under ~200 words
+  (confirmation + pointers). The file is the deliverable; the message is a receipt.
 - **One-shot `chat -q` kills background delegates.** The conversation exits when the
   turn ends, interrupting any still-running subagent (verified 2026-08-31: implementer
   interrupted 17s into its first model call). Builds must run in a persistent session
