@@ -58,8 +58,6 @@ Prerequisites: [Hermes Agent](https://hermes-agent.nousresearch.com/docs) >= 0.1
 
 ```bash
 hermes profile install github.com/Salt-555/ptah
-hermes login --provider nous    # reviewer auth rides your own auth.json
-hermes -p ptah
 ```
 
 Recipients bring their own credentials — `auth.json` and `.env` are never
