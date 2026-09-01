@@ -33,25 +33,6 @@ one-line swap in `MODELS` to change reviewer lineage).
 hermes profile install github.com/Salt-555/ptah
 ```
 
-Then:
-
-```bash
-hermes login --provider nous    # reviewer script reads your own auth.json
-hermes -p ptah
-```
-
-Recipients bring their own credentials — `auth.json` and `.env` are never
-shipped. Point `model.default` in the installed `config.yaml` at whatever
-provider/model you want Ptah and its delegates to run on; everything inherits
-the parent model by design.
-
-## Files
-
-- `SOUL.md` — identity and character
-- `AGENTS.md` — operating doctrine, roster, gates, iron laws
-- `skills/ptah-pipeline/` — the executable job description + reviewer script
-- `config.yaml` — clean starting config (no personal endpoints, no channel IDs)
-
 ## License
 
 MIT
