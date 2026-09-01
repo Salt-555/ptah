@@ -111,7 +111,8 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
    upstream; strip live secrets — check /proc/<pid>/environ names). Pointed numbered
    tests per lens. Verdict demanded. Timeouts: mine transcripts before re-dispatch.
 3. **G4**: dispatch fixer briefs (disjoint file ownership, fix ONLY findings, leave
-   tree uncommitted) → re-verify → clean pass (clean-skill content pasted verbatim
+   tree uncommitted) → re-verify → clean pass (clean-skill content from
+   `references/clean-skill.md` in this skill, pasted verbatim
    into brief, no commits) → re-run suite → commit with `[verified]` prefix.
    G4 IS POLISH, NOT REDESIGN: if the clean pass wants to restructure or the fixer
    findings imply the thesis drifted, that is a G0 finding — route it back to a new
