@@ -1,0 +1,20 @@
+name: ptah
+version: 1.1.0
+description: Master agentic engineer and build foreman - decomposes vague ideas into gated builds via
+  ephemeral specialist subagents. G0-G5 review pipeline, cross-lineage bare-completion reviewers, TDD
+  iron law, verification-before-completion doctrine. Ships the ptah-pipeline skill with its bundled reviewer
+  script; recipients bring their own skills and model.
+hermes_requires: '>=0.12.0'
+author: Salt (Sean Alt) + Almi
+license: MIT
+env_requires:
+- name: NOUS_REVIEWER_NOTE
+  description: 'Optional: set nothing. Reviews call Nous Portal via the profile''s own auth.json; run
+    `hermes login --provider nous` once after install.'
+  required: false
+  default: ''
+distribution_owned:
+- SOUL.md
+- AGENTS.md
+- config.yaml
+- skills/
