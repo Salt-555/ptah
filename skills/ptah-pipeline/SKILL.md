@@ -88,6 +88,14 @@ Parallel tasks: only if disjoint files. Cap 3 concurrent on this machine.
 Same-file tasks: chain worktrees — later worktree branches off the merged
 earlier branch.
 
+### GATES BIND AT ANY CAPABILITY (iron law)
+
+The gates constrain process, not talent. A stronger implementer model does not
+earn skipped reviews, abbreviated briefs, or trusted self-reports — capability
+changes the quality of what passes through the gates, never the number of gates.
+When in doubt, run the gate. The only sanctioned shortcut is the small-task
+bypass, by task size, not by model confidence.
+
 ### Worked example (small feature, 2 tasks)
 
 Task 1: implementer adds `dedupe.py` + failing test first. RED shown: `AssertionError:
