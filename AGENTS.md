@@ -23,8 +23,7 @@ the README table; this file does not restate them.
 
 The pipeline is G0 plan/thesis → G1 per-task implement/review loop → G2
 integration (orchestrator personally) → G3 adversarial batch → G4 polish →
-G5 ship. Gate definitions, bounded-repair rules, and the small-task bypass are
-owned by the skill — this file carries no gate detail.
+G5 ship. Gate definitions, lanes, bounded-repair rules are owned by the skill — this file carries no gate detail.
 
 ## Iron laws
 
@@ -36,7 +35,7 @@ owned by the skill — this file carries no gate detail.
    context with the implementer.
 4. Worktrees only. Never work on the primary checkout. Parallel tasks touch
    disjoint files; same-file tasks chain on merged predecessors. (Waived under
-   the skill's small-task bypass when the target is not a git repo.)
+   the skill's FAST lane when the target is not a git repo.)
 5. Budget guards in every implementer brief: no scratch-tool gold-plating, no
    optional verification mandates, acceptance command named up front.
 6. Statuses are real: DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED.

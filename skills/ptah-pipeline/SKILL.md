@@ -1,7 +1,7 @@
 ---
 name: ptah-pipeline
 description: Use when building a product/feature from an idea, reviewing code, or adding a feature — the full gated build pipeline with ephemeral specialist subagent briefs. This is Ptah's job description.
-version: 1.3.2
+version: 1.3.3
 author: Ptah (built for Salt, 2026-08-31)
 license: MIT
 metadata:
@@ -20,18 +20,29 @@ self-report. Every claim carries fresh evidence.
 Announce which phase you're in. Keep the Operator informed at gate failures and at ship —
 not per-tool-call.
 
-## Phase routing
+## Phase routing — three lanes, chosen by objective criteria
 
-- **"make X" / "build X"** (new thing) → Phase A (Plan) → Phase B (Build) → C (Verify) → D (Ship)
-- **"add feature to <repo>"** → minimum recon (file list, entry points, test command,
-  conventions — nothing deeper) → A → B → C → D
+Lane selection is by what the WORK IS, never by how confident you feel
+(confidence-based gate-skipping is banned — see iron law on lanes below).
+
+| Lane | Objective criteria (any ONE qualifies) | What runs |
+|---|---|---|
+| **FAST** | 1-2 files; clear spec; no deploy/auth/money surface; no schema/API breaks | One implementer + one combined spec+quality review (delegate reviewer, no external script) + your own verification. Worktree iron law waived when target is not a git repo (say so). No G2/G3/G4 ceremonies. |
+| **STANDARD** | One coherent feature; ≤ ~5 tasks; internal surface only (no deploy, no payment/auth flows, no data migrations); tests exist or are cheap to add | Phase A plan (abbreviated: thesis + task graph, no full code-completeness ceremony for strong models) → Phase B per-task implement/review loop → G2 integration smoke by you → G5 ship. G3 adversarial batch runs ONLY on money/auth/security-relevant diffs. |
+| **FULL** | Default for new builds; anything with deploy/auth/money/data-migration surface; multi-repo; any task the Operator flags high-stakes | The whole pipeline: A → B → C (G2+G3+G4) → D. No lane skipping on FULL. |
+
+Routing rules:
+- When a task sits between lanes, take the STRICTER lane. Upgrading lanes
+  mid-build is free; downgrading requires the Operator's explicit OK.
+- The implementer's own request ("this is bigger than it looks") upgrades the
+  lane immediately — never talk a worker out of an upgrade.
+- ANNOUNCE the lane and the criteria that chose it, every time.
+
+- **"make X" / "build X"** (new thing) → lane by criteria → A → B → (C) → D
+- **"add feature to <repo>**" → minimum recon (file list, entry points, test command,
+  conventions — nothing deeper) → lane by criteria → A → B → (C) → D
 - **"review X"** → recon → Phase B' (Review-only: adversarial batch + spec + quality
   passes, no edits) → report. No fix phase unless asked.
-- **Small task** (1-2 files, < ~1 hour, clear spec): small-task bypass — one
-  implementer dispatch + one spec+quality combined review (delegate reviewer,
-  no external script) + your own verification. Worktree iron law is waived
-  when the target is not a git repo (say so in the report). Skip phases C/D
-  ceremonies. Say you're using the bypass.
 
 ## Phase A — Plan (G0)
 
@@ -45,7 +56,15 @@ Dispatch the architect brief (below). Review its plan yourself:
 - [ ] Tasks decomposed to independently verifiable units of any size — the unit
   is as small as it needs to be, as large as one review can cleanly judge
 - [ ] Exact file paths, exact commands + expected output per task
-- [ ] DRY, YAGNI, TDD; file responsibilities clear
+- [ ] DRY, YAGNI, TDD (production code); file responsibilities clear
+- [ ] ACCEPTANCE EVIDENCE NAMED PER TASK: every task states up front the
+  cheapest RELIABLE check that proves it done — the exact command and its
+  expected output. Production code → a failing-then-passing test (RED must
+  fail for the right reason). Config/infra/docs/UI → the appropriate
+  acceptance check (command output, rendered artifact, diff inspection,
+  linter/schema validation). "Cheapest" never means "weakest": a check that
+  cannot fail is not evidence. If you cannot name the evidence, the task is
+  not ready to dispatch.
 - [ ] File-structure map before tasks; parallel tasks touch disjoint files
 - [ ] CODE COMPLETENESS SCALES WITH WORKER CAPABILITY: include complete
   copy-pasteable code for every task a current-model implementer could fumble.
@@ -65,19 +84,36 @@ For each task: create the worktree (`git worktree add`), dispatch implementer
 brief. Any reviewer rejection → the SAME implementer brief + findings gets a fix
 dispatch → re-review. Only mark the task done when both reviews approve.
 
-### Bounded repair — the Hermes 4 rule (Teknium/Nous, verified)
+### Bounded repair — diagnose before you retry (the Hermes 4 rule, extended)
 
 Iterate until pass, or a MAXIMUM ITERATION COUNT, then discard the attempt:
 
-- MAX 2 FIX LOOPS per task per failing gate. A third pass on the same failure
-  with the same context is self-preference bias, not diligence.
+- DIAGNOSE BEFORE THE NEXT DISPATCH: before ANY retry, read the failure
+  evidence (transcript, reviewer findings, test output) and classify it:
+  - **Implementation error** (plan was right, worker executed it wrong) →
+    repair: same brief + findings to a fix dispatch. This is the ONLY case
+    the fix loop exists for.
+  - **Bad plan** (tasks impossible as decomposed, contradictions, thesis
+    drift) → re-plan: G0 finding, back to Phase A. Do not burn fix loops on
+    a plan that cannot be satisfied — a repair that "succeeds" against a
+    broken spec produces verified wrongness.
+  - **Missing information** (undeclared dependency, unknown API shape, no
+    test command) → recon: gather the missing context first, THEN re-dispatch
+    with the brief completed. Retrying uninformed is not diligence, it is
+    dice-rolling.
+  - **Bad trajectory** (plan and context are fine; the model's execution went
+    sideways — confused, scope-crept, hallucinated) → resample: fresh
+    implementer, new worktree, brief re-derived from the task spec, never
+    seeded with the failed attempt.
+- MAX 2 FIX LOOPS per task per failing gate, and ONLY for implementation
+  errors. A third pass on the same failure with the same context is
+  self-preference bias, not diligence.
 - RESAMPLE AFTER REPEATED FAILURE: after 2 failed fix loops on a task whose
   acceptance is objective (binary check — exact output, test suite, schema
-  validation), throw away the worktree and dispatch a FRESH implementer from
-  scratch: new worktree, brief re-derived from the task spec — never seeded
-  with the failed attempt's context. SELECTION BEATS CORRECTION: generating a
-  new trajectory is often cheaper than repairing a broken one. Resamples enter
-  the same spec/quality gates as any first attempt (never merge unverified).
+  validation), throw away the worktree and resample (see above).
+  SELECTION BEATS CORRECTION: generating a new trajectory is often cheaper
+  than repairing a broken one. Resamples enter the same spec/quality gates
+  as any first attempt (never merge unverified).
 - A resample that also fails twice means the TASK is wrong, not the workers:
   escalate to ptah as a G0 finding (bad decomposition, missing dependency, or
   thesis drift). Escalations are real: NEEDS_CONTEXT / BLOCKED — never
@@ -93,13 +129,18 @@ bigger hardware.
 Same-file tasks: chain worktrees — later worktree branches off the merged
 earlier branch.
 
-### GATES BIND AT ANY CAPABILITY (iron law)
+### GATES BIND AT ANY CAPABILITY; LANES NEVER BIND ON CONFIDENCE (iron law)
 
 The gates constrain process, not talent. A stronger implementer model does not
 earn skipped reviews, abbreviated briefs, or trusted self-reports — capability
 changes the quality of what passes through the gates, never the number of gates.
-When in doubt, run the gate. The only sanctioned shortcut is the small-task
-bypass, by task size, not by model confidence.
+
+Lane selection is an EVIDENCE decision, not a mood: only the objective
+criteria in the routing table may pick a lane. "I'm confident," "the model is
+smart," "it's probably fine" are banned as routing inputs — those are the
+self-preference failure modes this whole doctrine exists to prevent. When in
+doubt, take the stricter lane. The only sanctioned shortcuts are lane
+criteria themselves, and lane upgrades are always free.
 
 ### Worked example (small feature, 2 tasks)
 
@@ -108,7 +149,7 @@ dedupe_rows not defined`. GREEN: `5 passed`. SHA reported. Spec-reviewer finds m
 `--keep last` flag from spec → fix dispatch → re-review passes. Quality-reviewer flags
 magic number 3 → fix dispatch → approved. Only then Task 2.
 
-## Cross-lineage review tier (G1/G3 reviewers)
+## Cross-lineage review tier (STANDARD/FULL lane reviewers)
 
 Reviews are BARE COMPLETIONS, not agent dispatches — no tools, no injected
 context (--ignore-rules), read-only by construction. They run through the
@@ -143,9 +184,10 @@ no model and never silently picks one:
    ship report that reviews ran same-lineage at their request.
 4. Record the choice (memory note) so later sessions don't re-ask.
 
-Small-task bypass exception: the bypass's single combined review is a
+Small-task exception (FAST lane): the FAST lane's single combined review is a
 delegate reviewer (same briefs, no script, no external egress) — the
-bare-completion path is for real builds (G1/G3), where cross-lineage matters.
+bare-completion path is for real builds (STANDARD/FULL lanes), where
+cross-lineage matters.
 
 ATTRIBUTION: the judge-weights-differ-from-generator-weights rule is Teknium's
 (Hermes 4 Technical Report, arXiv:2508.18255 §2.1.2, citing self-preference

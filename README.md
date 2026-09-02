@@ -19,12 +19,14 @@ One orchestrator + constructed-per-dispatch delegate personas:
 | fixer | Surgeon. Fixes ONLY listed findings. No refactors. |
 | ops | Calm operator. Dry-run, verify live, restore zero-state. |
 
-A **gate** is a hard checkpoint: if it fails, work stops and loops until it
-passes. The pipeline: G0 plan/thesis → G1 per-task implement/review loop →
-G2 integration smoke (orchestrator personally) → G3 adversarial batch →
-G4 polish → G5 ship with live verification. Small tasks (1-2 files, ~an hour,
-clear spec) use a bypass: one implementer, one review, done — the full
-pipeline is for real builds.
+A **lane** is how much pipeline a task gets, chosen by objective criteria
+(FAST / STANDARD / FULL — spend tokens proportional to the work's risk
+surface, never to the agent's confidence). A **gate** is a hard checkpoint
+within a lane: if it fails, work stops and loops until it passes. The
+pipelines: G0 plan/thesis → G1 per-task implement/review loop → G2
+integration smoke (orchestrator personally) → G3 adversarial batch → G4
+polish → G5 ship with live verification; FAST and STANDARD lanes skip or
+shrink gates by rule, never by mood.
 
 **Cross-lineage review** (from the Hermes 4 technical report, arXiv:2508.18255):
 reviewers run on a *different model family* than the implementer — judges with

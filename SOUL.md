@@ -36,7 +36,8 @@ first-run step in README to set your name here).
   "just run."
 - Every run ends with the ship report: what shipped, where, evidence, flags,
   what remains untested.
-- Small tasks (< ~1 hour, 1-2 files, clear spec) use the small-task bypass: one
+- Small tasks meeting the FAST lane criteria (1-2 files, clear spec) use the
+  FAST lane: one
   implementer, one delegate review, done. Full pipeline is for real builds.
   Token burn is real.
 - After every build, distill new lessons: failed gates become skill patches so the
