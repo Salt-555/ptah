@@ -1,7 +1,7 @@
 ---
 name: ptah-pipeline
 description: Use when building a product/feature from an idea, reviewing code, or adding a feature — the full gated build pipeline with ephemeral specialist subagent briefs. This is Ptah's job description.
-version: 1.3.4
+version: 1.3.5
 author: Ptah (built for Salt, 2026-08-31)
 license: MIT
 metadata:
@@ -241,6 +241,29 @@ this skill or a companion skill (watch-fail-then-write rule: if you didn't watch
 agent fail, you don't know the fix teaches the right thing). Propose the patch to
 the Operator, apply on approval.
 
+## Worker skill access — read-enabled for builders, closed for judges
+
+Delegated children inherit this profile's toolsets, including the `skills`
+toolset (`skills_list` / `skill_view` / `skill_manage`) and the full index of
+enabled skills. That is deliberate and role-differentiated:
+
+- **Builders (implementer, fixer, ops, architect)** — MAY load skills relevant
+  to their task via `skill_view` (e.g. `test-driven-development`,
+  `systematic-debugging`, `safe-code-edits`, `clean` conventions). An
+  implementer that hits a debugging wall SHOULD load `systematic-debugging`
+  before flailing. The brief still carries everything role-specific — skills
+  supplement the brief, they never replace it.
+- **Judges (spec-reviewer, quality-reviewer, adversarial)** — the brief ends
+  with: `SKILLS: do not load any skills. Judge only what is in this brief and
+  the diff.` A judge pulling in outside methodology contaminates the gate with
+  criteria the task was never graded on, and a reviewer reading playbook
+  content mid-review drifts from the verdict contract.
+- **NOBODY writes skills from inside a build**: no `skill_manage` calls from
+  any delegated worker, ever. Skill authorship happens only in the distill-
+  lessons loop, by the foreman, with the Operator's approval (watch-fail-
+  then-write). A worker that believes a lesson should be captured reports it
+  in its final message instead.
+
 ---
 
 # Brief templates (paste into delegate_task goal; context carries paths/env)
@@ -286,6 +309,9 @@ STRICT TDD — THE IRON LAW: no production code without a failing test first.
 
 BUDGET GUARD: no elaborate harnesses, no browser automation, no gold-plating. The
 acceptance gate is <exact command>. Keep new test code minimal.
+SKILLS: you MAY load relevant skills with skill_view (test-driven-development,
+systematic-debugging, safe-code-edits). Do not write or edit skills (no
+skill_manage). The brief above still governs — skills supplement, never replace.
 
 DO NOT: touch files outside your scope, rebuild/deploy, work outside the worktree.
 
@@ -302,7 +328,8 @@ SHA, the RED output you watched fail, the GREEN suite output, 3-line diff summar
 ```
 You are the Spec Compliance Reviewer. You are paranoid by design. The implementer
 finished suspiciously quickly and their report may be incomplete, inaccurate, or
-optimistic. Verify everything independently.
+optimistic. Verify everything independently. SKILLS: do not load any skills. Judge
+only what is in this brief and the diff.
 
 WHAT WAS REQUESTED: <full task spec>
 WHAT THEY CLAIM: <implementer report>
@@ -324,6 +351,7 @@ missing/extra/misread tag.
 ```
 You are the Code Quality Reviewer. Dispatch only after spec compliance passes.
 You are fair but unsoftened. Perfectionist about maintainability.
+SKILLS: do not load any skills. Judge only what is in this brief and the diff.
 
 SCOPE: diff BASE_SHA..HEAD_SHA in <worktree>. WHAT_WAS_IMPLEMENTED: <summary>.
 
@@ -343,6 +371,7 @@ Minor=note) / Assessment (Ready to proceed or Not yet). Evidence with file:line.
 
 ```
 You are the Adversarial <USER/ABUSER/BUYER>. Your job is to break this, not admire it.
+SKILLS: do not load any skills. Judge only what is in this brief and the target.
 
 LENS: USER follows docs/onboarding LITERALLY and verifies every claim against real
 behavior (catches doc-vs-reality). ABUSER attacks money/security paths: races,
@@ -402,9 +431,11 @@ REPORT: services affected, verification outputs, zero-state confirmation.
   interrupted 17s into its first model call). Builds must run in a persistent session
   — interactive/tmux chat, or the gateway chat (Bot Mode). In `-q` mode, either wait
   for the delegate synchronously within the turn or do not use `-q`.
-- Delegates cannot ask you questions mid-run or load skills — every secret, path,
+- Delegates cannot ask you questions mid-run — every secret, path,
   expected result, and rule goes IN the brief.
-- Copy skill content verbatim into briefs that need it (e.g. clean rules).
+- Copy skill content verbatim into briefs that need it (e.g. clean rules) UNLESS
+  the worker type is builder-class (implementer/fixer/ops) — those load skills
+  themselves via skill_view; judges get the closed-brief treatment instead.
 - A timed-out subagent is NOT a failed step: mine `cache/delegation/live/<id>/task-0.log`
   for its tool results before re-dispatching. Recover the work, not the conclusion.
 - Continuations, not redos: "DONE (do not touch)" with exact files/exports/test counts,
