@@ -97,6 +97,17 @@ Then try:
 ptah, build me a small CLI that dedupes CSVs by email column, with tests
 ```
 
+### Skills environment
+
+Ptah runs on the **Hermes-bundled dev skills** — nothing external is required
+or shipped. On first launch Hermes seeds its built-in software-development
+surface (TDD, systematic-debugging, requesting-code-review, codebase
+inspection, simplify-code, spike, dogfood QA, debugger skills, the agent CLIs,
+and the `github` category). All of it is enabled by default; to trim, use
+`hermes -p ptah skills config`. The pipeline skill bundles its own copy of the
+`clean` pass rules (`skills/ptah-pipeline/references/clean-skill.md`) so the
+G4 gate needs nothing from the skills hub.
+
 ### Updates
 
 ```bash

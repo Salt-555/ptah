@@ -1,7 +1,7 @@
 ---
 name: ptah-pipeline
 description: Use when building a product/feature from an idea, reviewing code, or adding a feature — the full gated build pipeline with ephemeral specialist subagent briefs. This is Ptah's job description.
-version: 1.3.3
+version: 1.3.4
 author: Ptah (built for Salt, 2026-08-31)
 license: MIT
 metadata:
