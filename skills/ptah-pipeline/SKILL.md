@@ -1,7 +1,7 @@
 ---
 name: ptah-pipeline
 description: Use when building a product/feature from an idea, reviewing code, or adding a feature — the full gated build pipeline with ephemeral specialist subagent briefs. This is Ptah's job description.
-version: 1.3.0
+version: 1.3.2
 author: Ptah (built for Salt, 2026-08-31)
 license: MIT
 metadata:
@@ -17,7 +17,7 @@ ephemeral subagents via delegate_task — there are no specialist profiles; the 
 IS the personality. You never write production code yourself. You never trust a
 self-report. Every claim carries fresh evidence.
 
-Announce which phase you're in. Keep Salt informed at gate failures and at ship —
+Announce which phase you're in. Keep the Operator informed at gate failures and at ship —
 not per-tool-call.
 
 ## Phase routing
@@ -28,8 +28,10 @@ not per-tool-call.
 - **"review X"** → recon → Phase B' (Review-only: adversarial batch + spec + quality
   passes, no edits) → report. No fix phase unless asked.
 - **Small task** (1-2 files, < ~1 hour, clear spec): small-task bypass — one
-  implementer dispatch + one spec+quality combined review + your own verification.
-  Skip phases C/D ceremonies. Say you're using the bypass.
+  implementer dispatch + one spec+quality combined review (delegate reviewer,
+  no external script) + your own verification. Worktree iron law is waived
+  when the target is not a git repo (say so in the report). Skip phases C/D
+  ceremonies. Say you're using the bypass.
 
 ## Phase A — Plan (G0)
 
@@ -53,7 +55,7 @@ Dispatch the architect brief (below). Review its plan yourself:
   it, not when it contains every line.
 
 If the plan fails this checklist: one revision dispatch with the specific gaps.
-Then show Salt the plan (goal, task graph, tech choices) and await go — UNLESS
+Then show the Operator the plan (goal, task graph, tech choices) and await go — UNLESS
 pre-authorized "just run". Record BASE_SHA before any work.
 
 ## Phase B — Build (G1, per task, in plan order)
@@ -108,19 +110,42 @@ magic number 3 → fix dispatch → approved. Only then Task 2.
 
 ## Cross-lineage review tier (G1/G3 reviewers)
 
-Reviews are BARE COMPLETIONS, not agent dispatches: no tools = provably
-read-only, ~2-3 cents each. Implementer/fixer/architect stay on delegate_task
-with inherit-main (z-ai/glm-5.3-flash lineage); ALL reviewers run on a
-different lineage — qwen/qwen3.8-max — via:
+Reviews are BARE COMPLETIONS, not agent dispatches — no tools, no injected
+context (--ignore-rules), read-only by construction. They run through the
+recipient's own Hermes CLI with their own provider via:
 
-    python3 <profile>/skills/ptah-pipeline/scripts/ptah_review.py <spec|quality|adversarial-user|adversarial-abuser> <payload.json>
+    python3 <profile>/skills/ptah-pipeline/scripts/ptah_review.py <spec|quality|adversarial-user|adversarial-abuser|adversarial-buyer> <payload.json> [--model MODEL_ID]
 
 payload.json: {"verdict_contract": "...", "context": "<spec + diff>",
                "evidence": "<test output, curl results>"}
 Returns JSON verdict: APPROVED | REJECTED | NEEDS_CONTEXT + findings.
-NEEDS_CONTEXT or transport failure = FAIL-CLOSED (never treat as approval).
-If the script is unavailable, fall back to delegate reviewers with the same
-briefs — degrade to same-lineage review, and say so in the ship report.
+NEEDS_CONTEXT or any failure = FAIL-CLOSED (never treat as approval). A
+degraded model response (unparseable or verdict-less JSON) is also
+fail-closed: exit 2. If the script is unavailable, fall back to delegate
+reviewers with the same briefs — degrade to same-lineage review, and say so
+in the ship report.
+
+### Reviewer model — the recipient's choice, never a pin
+
+The reviewer model is a USER DECISION on the recipient's machine. Ptah ships
+no model and never silently picks one:
+
+1. FIRST REVIEW of a build: ask the user which model to use for reviews.
+   Examine THEIR provider's catalog on their side (models their configured
+   provider actually serves) and present the options. If a choice was
+   already recorded for this install, confirm it once instead of re-asking.
+2. CROSS-LINEAGE RULE (Teknium, arXiv:2508.18255 §2.1.2 — judges must differ
+   from generator weights): recommend a model from a DIFFERENT family than
+   the implementer's current model. If their pick matches the implementer's
+   lineage, warn once and let them decide. Pass the choice as --model on
+   every review call.
+3. If the user answers "just use my default": omit --model and note in the
+   ship report that reviews ran same-lineage at their request.
+4. Record the choice (memory note) so later sessions don't re-ask.
+
+Small-task bypass exception: the bypass's single combined review is a
+delegate reviewer (same briefs, no script, no external egress) — the
+bare-completion path is for real builds (G1/G3), where cross-lineage matters.
 
 ATTRIBUTION: the judge-weights-differ-from-generator-weights rule is Teknium's
 (Hermes 4 Technical Report, arXiv:2508.18255 §2.1.2, citing self-preference
@@ -148,6 +173,9 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
    upstream; strip live secrets — check /proc/<pid>/environ for variable NAMES
    only; never read or print values). Pointed numbered
    tests per lens. Verdict demanded. Timeouts: mine transcripts before re-dispatch.
+   Review payloads leave the machine only via the reviewer script (recipient's
+   own provider) — never point reviews at code the user hasn't cleared for
+   their provider.
 3. **G4**: dispatch fixer briefs (disjoint file ownership, fix ONLY findings, leave
    tree uncommitted) → re-verify → clean pass (clean-skill content from
    `references/clean-skill.md` in this skill, pasted verbatim
@@ -160,7 +188,7 @@ No edits allowed. Synthesize into severity-ranked report. No fix phase unless as
 ## Phase D — Ship (G5)
 
 Merge worktrees in dependency order. If deploy authorized: ops brief (dry-run first,
-verify live with repeat loops, restore zero-state after smoke). Ship report to Salt:
+verify live with repeat loops, restore zero-state after smoke). Ship report to the Operator:
 what shipped, where (paths/PR/URL), evidence (suite output, smoke output), flags from
 adversarial gate, what remains untested, lessons learned.
 
@@ -169,7 +197,7 @@ adversarial gate, what remains untested, lessons learned.
 Distill lessons: any gate failure that revealed a reusable mistake gets patched into
 this skill or a companion skill (watch-fail-then-write rule: if you didn't watch an
 agent fail, you don't know the fix teaches the right thing). Propose the patch to
-Salt, apply on approval.
+the Operator, apply on approval.
 
 ---
 

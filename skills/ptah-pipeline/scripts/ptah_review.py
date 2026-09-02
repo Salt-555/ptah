@@ -1,64 +1,52 @@
 #!/usr/bin/env python3
-"""Ptah bare-completion reviewer — cross-lineage review via Nous Portal.
+"""Ptah bare-completion reviewer — runs on the recipient's own Hermes agent.
 
-Dispatch pattern for spec/quality/adversarial reviews:
-a review is a BARE COMPLETION, not an agent. No tools = provably read-only
-and costs ~2-3 cents per review.
+No auth, no endpoints, no provider or model pins in this file. The reviewer
+session runs through the recipient's installed `hermes` CLI with THEIR
+config, THEIR provider, THEIR credentials (the documented programmatic path:
+`hermes chat --oneshot -Q --query-file`). This script only:
+  1. builds the review prompt for the requested lens,
+  2. invokes hermes with NO toolsets (read-only by construction),
+  3. validates the verdict object — fail-closed on ANY error.
 
-Reviewer: qwen/qwen3.8-max (Alibaba lineage), decorrelated from the
-implementer lineage per the Hermes 4 rule (arXiv:2508.18255 §2.1.2): judge
-weights must differ from generator weights to prevent self-preference.
-(Do NOT cite DHH's two-model workflow here — that is an interaction-speed
-pattern, not decorrelation.)
+The reviewer MODEL is a decision the recipient makes (the ptah-pipeline skill
+asks them which model their provider serves for reviews). This script never
+picks one: without --model it inherits the recipient's configured default.
+Cross-lineage doctrine (Hermes 4 rule, arXiv:2508.18255 §2.1.2 — judge
+weights must differ from generator weights) lives in the skill, which passes
+--model when the user chose a reviewer model.
 
-Usage (from the ptah profile):
-    python3 <profile>/skills/ptah-pipeline/scripts/ptah_review.py <review_type> <payload_file>
-      review_type: spec | quality | adversarial-user | adversarial-abuser
+Usage:
+    ptah_review.py <review_type> <payload_file> [--model MODEL_ID] [--timeout S]
+      review_type: spec | quality | adversarial-user | adversarial-abuser | adversarial-buyer
       payload_file: JSON {"verdict_contract": "...", "context": "...",
                           "evidence": "..."}
 
-Writes verdict JSON to stdout; exits 2 on ANY failure — transport, missing
-auth, unreadable payload (fail-closed: an unavailable reviewer is never an
-approval). Data-egress note: the payload (which contains code diffs) is sent
-to https://inference-api.nousresearch.com and processed by a third-party-lineage
-model. Do not review proprietary code you would not send to an external API.
+Writes verdict JSON to stdout; exits 2 on ANY failure — CLI error, transport,
+unreadable payload, or a model response that is not a valid verdict object
+(fail-closed: an unavailable or degraded reviewer is never an approval).
+Usage errors exit 1 before anything runs.
 """
+import argparse
 import json
 import os
+import subprocess
 import sys
-import urllib.request
+import tempfile
 
-MODELS = {
-    "spec": "qwen/qwen3.8-max",
-    "quality": "qwen/qwen3.8-max",
-    "adversarial-user": "qwen/qwen3.8-max",
-    "adversarial-abuser": "qwen/qwen3.8-max",
-}
+REVIEW_TYPES = ("spec", "quality", "adversarial-user", "adversarial-abuser",
+                "adversarial-buyer")
 
-BASE = "https://inference-api.nousresearch.com/v1/chat/completions"
+VALID_VERDICTS = {"APPROVED", "REJECTED", "NEEDS_CONTEXT"}
 
 
-def load_token():
-    auth = json.load(open(os.path.expanduser("~/.hermes/auth.json")))
+class _ArgParser(argparse.ArgumentParser):
+    """Usage errors exit 1 (ptah contract: exit 2 is reserved for fail-closed)."""
 
-    def find_nous(d):
-        if isinstance(d, dict):
-            for k, v in d.items():
-                if k == "nous":
-                    yield v
-                yield from find_nous(v)
-        elif isinstance(d, list):
-            for v in d:
-                yield from find_nous(v)
-
-    for v in find_nous(auth):
-        if isinstance(v, list):
-            v = v[0] if v else None
-        if isinstance(v, dict):
-            tok = v.get("access_token")
-            if tok:
-                return tok
-    raise RuntimeError("no nous token in auth.json")
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        print(f"error: {message}", file=sys.stderr)
+        sys.exit(1)
 
 
 def build_prompt(review_type, payload):
@@ -86,29 +74,90 @@ def build_prompt(review_type, payload):
             "races, double-spend, injection, auth bypass, secret leaks, "
             "input validation gaps. Severity-ranked findings with evidence."
         ),
+        "adversarial-buyer": (
+            "You are an adversarial BUYER. Try to lose money or be misled: "
+            "refund logic, consent, point-of-payment honesty, misleading "
+            "claims. Severity-ranked findings with evidence."
+        ),
     }
     return (
         f"{contracts[review_type]}\n\n"
-        f"OUTPUT CONTRACT: return ONLY valid JSON: "
-        f'{{"verdict": "APPROVED" | "REJECTED" | "NEEDS_CONTEXT", '
-        f'"findings": [{{"severity": "critical"|"high"|"medium"|"low", '
-        f'"location": "file:line or endpoint", "issue": "...", "evidence": "..."}}], '
-        f'"summary": "one sentence"}}\n\n'
+        "OUTPUT CONTRACT: return ONLY valid JSON, nothing else:\n"
+        '{"verdict": "APPROVED" | "REJECTED" | "NEEDS_CONTEXT", '
+        '"findings": [{"severity": "critical"|"high"|"medium"|"low", '
+        '"location": "file:line or endpoint", "issue": "...", "evidence": "..."}], '
+        '"summary": "one sentence"}\n\n'
         f"<payload>\n{json.dumps(payload, indent=1)}\n</payload>"
     )
 
 
+def extract_json(content):
+    """Pull the outermost JSON object out of a possibly-fenced response."""
+    m = content.find("{")
+    end = content.rfind("}") + 1
+    if m == -1 or end <= m:
+        return None
+    try:
+        return json.loads(content[m:end])
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def validate_verdict(obj):
+    """Fail-closed gate: a response is a verdict only if fully well-formed."""
+    if not isinstance(obj, dict):
+        return False
+    if obj.get("verdict") not in VALID_VERDICTS:
+        return False
+    if not isinstance(obj.get("findings", []), list):
+        return False
+    if not isinstance(obj.get("summary"), str):
+        return False
+    return True
+
+
+def run_reviewer_cli(prompt, model, timeout):
+    """Invoke the recipient's own hermes CLI as a context-free reviewer.
+
+    Read-only by construction: toolsets resolve to none, rules/memory/skills
+    are not injected (--ignore-rules), and the run is tagged as tool-source so
+    review sessions stay out of the user's session lists.
+    """
+    fd, prompt_path = tempfile.mkstemp(suffix=".txt")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(prompt)
+        cmd = [
+            "hermes", "chat", "--oneshot", "-Q",
+            "--query-file", prompt_path,
+            "--ignore-rules",      # no AGENTS.md/memory/skill injection: no shared context
+            "-t", "none",          # not a valid toolset name -> zero tools resolve
+            "--source", "tool",    # documented non-pollution tag for integrations
+        ]
+        if model:
+            cmd += ["-m", model]
+        # Strip HERMES_* inheritance: a parent session's env must not re-arm
+        # toolsets or leak run context into the reviewer.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("HERMES_")}
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=timeout, env=env)
+    finally:
+        os.unlink(prompt_path)
+
+
 def main():
-    if len(sys.argv) != 3:
-        print(__doc__)
-        return 1
-    review_type, payload_path = sys.argv[1], sys.argv[2]
-    if review_type not in MODELS:
-        print(f"unknown review_type {review_type}; choices: {list(MODELS)}")
-        return 1
+    ap = _ArgParser()
+    ap.add_argument("review_type", choices=REVIEW_TYPES)
+    ap.add_argument("payload_file")
+    ap.add_argument("--model", default=None,
+                    help="reviewer model id served by the recipient's provider "
+                         "(chosen by the user; omit to inherit their configured default)")
+    ap.add_argument("--timeout", type=int, default=600,
+                    help="seconds to wait for the reviewer session (default 600)")
+    args = ap.parse_args()
 
     def fail_closed(e):
-        # fail-closed: ANY failure — transport, auth, payload — is never an approval
+        # fail-closed: ANY failure — transport, CLI, payload — is never an approval
         print(json.dumps({"verdict": "NEEDS_CONTEXT",
                           "findings": [{"severity": "critical",
                                         "location": "transport",
@@ -117,69 +166,30 @@ def main():
         return 2
 
     try:
-        payload = json.load(open(payload_path))
+        with open(args.payload_file) as f:
+            payload = json.load(f)
     except Exception as e:
         return fail_closed(e)
 
     try:
-        token = load_token()
+        proc = run_reviewer_cli(build_prompt(args.review_type, payload),
+                                args.model, args.timeout)
     except Exception as e:
         return fail_closed(e)
 
-    body = json.dumps({
-        "model": MODELS[review_type],
-        "messages": [{"role": "user", "content": build_prompt(review_type, payload)}],
-        "temperature": 0.1,
-        "max_tokens": 4000,  # reasoning model: thinking tokens count against this
-    }).encode()
+    if proc.returncode != 0:
+        return fail_closed(f"hermes chat exited {proc.returncode}: "
+                           f"{(proc.stderr or proc.stdout)[:300]}")
 
-    req = urllib.request.Request(
-        BASE, data=body, method="POST",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "User-Agent": "ptah-review/1.0",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            data = json.load(resp)
-        msg = data["choices"][0]["message"]
-        content = msg.get("content")
-        if not content:  # reasoning model burned tokens thinking; force non-thinking retry
-            body2 = json.dumps({
-                "model": MODELS[review_type],
-                "messages": [{"role": "user", "content": build_prompt(review_type, payload)
-                              + "\n\nIMPORTANT: respond with the JSON only. No thinking."}],
-                "temperature": 0.1,
-                "max_tokens": 8000,
-            }).encode()
-            req2 = urllib.request.Request(
-                BASE, data=body2, method="POST",
-                headers={"Authorization": f"Bearer {token}",
-                         "Content-Type": "application/json"})
-            with urllib.request.urlopen(req2, timeout=120) as resp2:
-                data = json.load(resp2)
-            content = data["choices"][0]["message"].get("content") or ""
-            if not content:
-                raise RuntimeError("model returned only reasoning, no content")
-        # extract JSON from response (tolerate fences)
-        m = content.find("{")
-        end = content.rfind("}") + 1
-        if m == -1 or end <= m:
-            print(json.dumps({"verdict": "NEEDS_CONTEXT",
-                              "findings": [], "summary": "unparseable review response",
-                              "raw": content[:500]}))
-            return 2
-        print(content[m:end])
-        return 0
-    except Exception as e:  # fail-closed: transport errors are NEVER approvals
-        print(json.dumps({"verdict": "NEEDS_CONTEXT",
-                          "findings": [{"severity": "critical",
-                                        "location": "transport",
-                                        "issue": f"reviewer unavailable: {e}"}],
-                          "summary": "review transport failed - fail-closed"}))
-        return 2
+    # "-Q" prints the final response; the outermost JSON object is the verdict.
+    parsed = extract_json(proc.stdout)
+    if parsed is None:
+        return fail_closed(f"unparseable review response: {proc.stdout[:300]}")
+    if not validate_verdict(parsed):
+        return fail_closed("response lacked a valid "
+                           "APPROVED/REJECTED/NEEDS_CONTEXT verdict")
+    print(json.dumps(parsed))
+    return 0
 
 
 if __name__ == "__main__":
