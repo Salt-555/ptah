@@ -7,41 +7,39 @@ no "should pass."
 
 ## What it is
 
-One orchestrator + constructed-per-dispatch delegate personas:
+One orchestrator + two constructed-per-dispatch worker roles:
 
-| Persona | Brief kernel |
+| Role | Brief kernel |
 |---|---|
-| architect | Opinionated senior designer. Writes the plan. |
-| implementer | Terse TDD zealot. No code without a failing test. |
-| spec-reviewer | Paranoid auditor. Code vs spec, line by line. Missing AND extra = fail. |
-| quality-reviewer | Perfectionist gate. Critical/Important/Minor findings. |
-| adversarial | Professional attacker. Buyer/user/abuser lenses. Verdict demanded. |
-| fixer | Surgeon. Fixes ONLY listed findings. No refactors. |
-| ops | Calm operator. Dry-run, verify live, restore zero-state. |
+| builder | Terse TDD zealot. No code without a failing test. Incremental file writes; final message under 100 words. Consolidates instead of duplicating. |
+| judge | Paranoid auditor with switchable lenses: SPEC, QUALITY, RESIDUE (a mechanical dead-code sweep — residue is a critical finding), ADVERSARIAL (money/auth/security surfaces). |
 
 A **lane** is how much pipeline a task gets, chosen by objective criteria
-(FAST / STANDARD / FULL — spend tokens proportional to the work's risk
-surface, never to the agent's confidence). A **gate** is a hard checkpoint
-within a lane: if it fails, work stops and loops until it passes. The
-pipelines: G0 plan/thesis → G1 per-task implement/review loop → G2
-integration smoke (orchestrator personally) → G3 adversarial batch → G4
-polish → G5 ship with live verification; FAST and STANDARD lanes skip or
-shrink gates by rule, never by mood.
+(FAST / FULL — spend tokens proportional to the work's risk surface, never
+to the agent's confidence). The foreman plans inline; an architect subagent
+is dispatched only for genuinely large builds (10+ tasks), which time out.
 
-**Cross-lineage review** (from the Hermes 4 technical report, arXiv:2508.18255):
-reviewers run on a *different model family* than the implementer — judges with
-different weights than the generator don't share its self-preference. Ptah
-ships **no reviewer model**: on the first review it asks you which model to
-use, examining what your own configured provider serves, and recommends a
-cross-lineage pick. Reviewers are bare completions (no tools, no injected
-context, read-only by construction) via the bundled `ptah_review.py`, running
-through your own Hermes CLI — your provider, your credentials, nothing
-hardcoded.
+**Discipline that the traces demanded** (hard-won over 15+ real runs):
+- **Delegation mechanics**: dedup-check before any dispatch; a timed-out
+  delegate is mined from its transcript, never hunted with `ps`; max 2 fix
+  loops, then resample; a wall-clock budget stops silent retry loops.
+- **Evidence ships with the artifact**: verification scripts, screenshots and
+  probe outputs land in `_verify/` beside the deliverable — never /tmp.
+- **Screenshot before claim**: anything visual requires the actual pixels
+  seen before it's claimed working.
+- **No duplicate implementations**: builders search the repo before shipping
+  a function that already exists.
 
-**Bounded repair** (also Hermes 4): max 2 fix loops per task, then throw away
-the worktree and resample a fresh implementer — generating a new attempt is
-often cheaper than patching a broken one. A twice-failed resample means the
-*task* was wrong, not the workers.
+**Bounded repair** (Hermes 4): max 2 fix loops per task, then throw away the
+worktree and resample a fresh builder — generating a new attempt is often
+cheaper than patching a broken one. A twice-failed resample means the *task*
+was wrong, not the workers.
+
+**Model policy**: everything inherits the profile's model — no pins, no
+tiering, no reviewer-model asking. Same-lineage review is the Operator's
+choice; the decorrelation principle (judges with different weights from the
+generator avoid self-preference bias — Hermes 4 Technical Report,
+arXiv:2508.18255 §2.1.2) is cited on request, never imposed.
 
 ## Trust & safety — read before installing
 
@@ -50,8 +48,8 @@ subagents, create git worktrees, and run terminal commands. Before first run,
 read:
 
 - `AGENTS.md` — the operating doctrine and iron laws
-- `skills/ptah-pipeline/SKILL.md` — the pipeline the agent will execute
-- `skills/ptah-pipeline/scripts/ptah_review.py` — the one subprocess-spawning script
+- `skills/ptah-pipeline/SKILL.md` — the pipeline the agent will execute (no
+  bundled scripts; the profile spawns nothing outside Hermes itself)
 
 **Isolation:** profile installs are scoped entirely to
 `~/.hermes/profiles/ptah/` — your root config, `auth.json`, `.env`, memories,
@@ -104,9 +102,7 @@ or shipped. On first launch Hermes seeds its built-in software-development
 surface (TDD, systematic-debugging, requesting-code-review, codebase
 inspection, simplify-code, spike, dogfood QA, debugger skills, the agent CLIs,
 and the `github` category). All of it is enabled by default; to trim, use
-`hermes -p ptah skills config`. The pipeline skill bundles its own copy of the
-`clean` pass rules (`skills/ptah-pipeline/references/clean-skill.md`) so the
-G4 gate needs nothing from the skills hub.
+`hermes -p ptah skills config`.
 
 ### Updates
 
@@ -122,7 +118,7 @@ to shipped defaults.
 
 - `SOUL.md` — identity and character (the one place to personalize)
 - `AGENTS.md` — operating doctrine, iron laws
-- `skills/ptah-pipeline/` — the executable job description + reviewer script
+- `skills/ptah-pipeline/` — the executable job description
 - `config.yaml` — clean starting config; you set model/provider/workspace
 
 ## License
